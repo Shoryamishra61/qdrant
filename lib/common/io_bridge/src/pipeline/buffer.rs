@@ -104,7 +104,7 @@ pub fn read_whole_into_sink<A, W, I>(
     file: &BlobFile<A>,
     from: u64,
     init: I,
-) -> impl Future<Output = UioResult<W>> + Send + 'static
+) -> impl Future<Output = UioResult<(W, u64)>> + Send + 'static
 where
     A: AsyncRead + Clone,
     I: FnOnce(u64) -> UioResult<W> + Send + 'static,
@@ -144,13 +144,14 @@ where
             }
         };
         request.set_end(size);
+        let tail_bytes = size.saturating_sub(from);
         let result = if let Some(stream) = stream {
             stream_into_sink(stream, size, from, init).await
         } else {
             init(size)
         };
         request.set_result(&result);
-        result
+        result.map(|sink| (sink, tail_bytes))
     }
 }
 
